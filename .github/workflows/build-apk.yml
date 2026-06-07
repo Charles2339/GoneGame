@@ -30,16 +30,6 @@ jobs:
             "platforms;android-34" \
             "ndk;23.2.8568313"
 
-      - name: Generate debug keystore
-        run: |
-          mkdir -p "$HOME/.android"
-          keytool -genkey -v \
-            -keystore "$HOME/.android/debug.keystore" \
-            -alias androiddebugkey \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Android Debug,O=Android,C=US"
-
       - name: Download Godot 4.3
         run: |
           wget -q \
@@ -48,7 +38,6 @@ jobs:
           unzip -q godot.zip
           chmod +x Godot_v4.3-stable_linux.x86_64
           sudo mv Godot_v4.3-stable_linux.x86_64 /usr/local/bin/godot
-          echo "Godot: $(godot --version)"
 
       - name: Download Godot 4.3 Export Templates
         run: |
@@ -59,59 +48,40 @@ jobs:
           unzip -q export_templates.tpz -d export_templates_tmp
           mv export_templates_tmp/templates/* ~/.local/share/godot/export_templates/4.3.stable/
           rm -rf export_templates_tmp export_templates.tpz
-          echo "Android templates:"
-          ls ~/.local/share/godot/export_templates/4.3.stable/ | grep android
 
-      - name: Run Godot import (creates editor_settings-4.3.tres)
+      - name: Run Godot import
         run: |
           mkdir -p ~/.config/godot
           godot --headless --path "${{ github.workspace }}" --import 2>&1 || true
-          echo "Settings files created:"
-          ls ~/.config/godot/
-
-      - name: Patch export_presets.cfg with absolute keystore path
-        run: |
-          sed -i \
-            "s|keystore/debug=\"debug.keystore\"|keystore/debug=\"$HOME/.android/debug.keystore\"|g" \
-            export_presets.cfg
-          grep "keystore/debug=" export_presets.cfg | head -1
 
       - name: Inject Android SDK settings into editor_settings-4.3.tres
         run: |
-          # Key insight: Godot 4.3 reads editor_settings-4.3.tres, not editor_settings-4.tres
-          # We inject our Android paths into the [resource] section
           SETTINGS_FILE="$HOME/.config/godot/editor_settings-4.3.tres"
-          
-          # Remove any existing android export settings
+          # Remove any existing android settings to avoid duplicates
           sed -i '/^export\/android\//d' "$SETTINGS_FILE"
-          
-          # Append our Android settings before the end of the file
-          cat >> "$SETTINGS_FILE" << ANDROID_SETTINGS
-          export/android/android_sdk_path = "$ANDROID_SDK_ROOT"
-          export/android/java_sdk_path = "$JAVA_HOME"
-          export/android/debug_keystore = "$HOME/.android/debug.keystore"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
-          export/android/shutdown_adb_on_exit = false
-          ANDROID_SETTINGS
-          
-          # Remove leading whitespace from heredoc lines
-          sed -i 's/^[[:space:]]*//' "$SETTINGS_FILE"
-          
-          echo "=== Final android settings in editor_settings-4.3.tres ==="
-          grep "android" "$SETTINGS_FILE"
+          # Append correct Android settings
+          printf 'export/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\nexport/android/shutdown_adb_on_exit = false\n' \
+            "$ANDROID_SDK_ROOT" \
+            "$JAVA_HOME" \
+            >> "$SETTINGS_FILE"
+          echo "=== FULL editor_settings-4.3.tres (last 30 lines) ==="
+          tail -30 "$SETTINGS_FILE"
+          echo "=== Android settings check ==="
+          grep "android_sdk_path\|java_sdk_path" "$SETTINGS_FILE"
 
       - name: Create output directory
         run: mkdir -p build/android
 
-      - name: Export APK (headless)
+      - name: Export APK (headless verbose, no signing)
         run: |
           godot --headless \
             --path "${{ github.workspace }}" \
+            --verbose \
             --export-debug "Android" \
             "${{ github.workspace }}/build/android/GoneGame-debug.apk" 2>&1
+          echo "Exit code: $?"
           echo "=== Build output ==="
-          ls -lah build/android/ || echo "No APK found"
+          ls -lah build/android/ 2>/dev/null || echo "No APK found"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
