@@ -30,7 +30,7 @@ jobs:
             "platforms;android-34" \
             "ndk;23.2.8568313"
 
-      - name: Generate debug keystore at standard Android path
+      - name: Generate debug keystore
         run: |
           mkdir -p "$HOME/.android"
           keytool -genkey -v \
@@ -39,9 +39,8 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
-          ls -lah "$HOME/.android/debug.keystore"
 
-      - name: Download Godot 4.3 (headless)
+      - name: Download Godot 4.3
         run: |
           wget -q \
             "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip" \
@@ -49,6 +48,7 @@ jobs:
           unzip -q godot.zip
           chmod +x Godot_v4.3-stable_linux.x86_64
           sudo mv Godot_v4.3-stable_linux.x86_64 /usr/local/bin/godot
+          echo "Godot: $(godot --version)"
 
       - name: Download Godot 4.3 Export Templates
         run: |
@@ -59,52 +59,50 @@ jobs:
           unzip -q export_templates.tpz -d export_templates_tmp
           mv export_templates_tmp/templates/* ~/.local/share/godot/export_templates/4.3.stable/
           rm -rf export_templates_tmp export_templates.tpz
+          echo "Android templates:"
+          ls ~/.local/share/godot/export_templates/4.3.stable/ | grep android
 
-      - name: Write Godot Android Editor Settings
+      - name: Run Godot import (creates editor_settings-4.3.tres)
         run: |
           mkdir -p ~/.config/godot
-          cat > ~/.config/godot/editor_settings-4.tres << 'SETTINGS'
-          [gd_resource type="EditorSettings" load_steps=1 format=3]
+          godot --headless --path "${{ github.workspace }}" --import 2>&1 || true
+          echo "Settings files created:"
+          ls ~/.config/godot/
 
-          [resource]
-          export/android/android_sdk_path = "/usr/local/lib/android/sdk"
-          export/android/java_sdk_path = "/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64"
-          export/android/debug_keystore = "/root/.android/debug.keystore"
-          export/android/debug_keystore_user = "androiddebugkey"
-          export/android/debug_keystore_pass = "android"
-          export/android/shutdown_adb_on_exit = false
-          SETTINGS
-          # Fix the keystore and java paths dynamically
-          sed -i "s|/root/.android/debug.keystore|$HOME/.android/debug.keystore|g" \
-            ~/.config/godot/editor_settings-4.tres
-          sed -i "s|/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.19-10/x64|$JAVA_HOME|g" \
-            ~/.config/godot/editor_settings-4.tres
-          # Remove leading whitespace from heredoc
-          sed -i 's/^[[:space:]]*//' ~/.config/godot/editor_settings-4.tres
-          echo "=== Final Editor Settings ==="
-          cat ~/.config/godot/editor_settings-4.tres
-
-      - name: Patch absolute keystore in export_presets.cfg
+      - name: Patch export_presets.cfg with absolute keystore path
         run: |
           sed -i \
             "s|keystore/debug=\"debug.keystore\"|keystore/debug=\"$HOME/.android/debug.keystore\"|g" \
             export_presets.cfg
           grep "keystore/debug=" export_presets.cfg | head -1
 
+      - name: Inject Android SDK settings into editor_settings-4.3.tres
+        run: |
+          # Key insight: Godot 4.3 reads editor_settings-4.3.tres, not editor_settings-4.tres
+          # We inject our Android paths into the [resource] section
+          SETTINGS_FILE="$HOME/.config/godot/editor_settings-4.3.tres"
+          
+          # Remove any existing android export settings
+          sed -i '/^export\/android\//d' "$SETTINGS_FILE"
+          
+          # Append our Android settings before the end of the file
+          cat >> "$SETTINGS_FILE" << ANDROID_SETTINGS
+          export/android/android_sdk_path = "$ANDROID_SDK_ROOT"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          export/android/shutdown_adb_on_exit = false
+          ANDROID_SETTINGS
+          
+          # Remove leading whitespace from heredoc lines
+          sed -i 's/^[[:space:]]*//' "$SETTINGS_FILE"
+          
+          echo "=== Final android settings in editor_settings-4.3.tres ==="
+          grep "android" "$SETTINGS_FILE"
+
       - name: Create output directory
         run: mkdir -p build/android
-
-      - name: Run Godot import (initialize project)
-        run: |
-          godot --headless --path "${{ github.workspace }}" --import 2>&1
-          echo "Import exit code: $?"
-
-      - name: Check what Godot wrote to config dir
-        run: |
-          echo "=== Config files after import ==="
-          ls -la ~/.config/godot/ || echo "No config dir"
-          echo "=== Settings content ==="
-          cat ~/.config/godot/editor_settings-4.tres
 
       - name: Export APK (headless)
         run: |
