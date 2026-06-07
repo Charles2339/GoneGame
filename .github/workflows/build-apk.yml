@@ -19,16 +19,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK components
+      - name: Configure pre-installed Android SDK
         run: |
-          sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
+          # Ubuntu 22.04 runners have the Android SDK pre-installed
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "SDK at: $ANDROID_HOME"
+          ls "$ANDROID_HOME" | head -10
+
+      - name: Install required Android SDK components
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager \
             "platform-tools" \
             "build-tools;34.0.0" \
             "platforms;android-34" \
             "ndk;23.2.8568313"
+          echo "ADB: $(which adb)"
+          ls "$ANDROID_HOME/build-tools/" | tail -3
 
       - name: Download Godot 4.3
         run: |
@@ -38,6 +47,7 @@ jobs:
           unzip -q godot.zip
           chmod +x Godot_v4.3-stable_linux.x86_64
           sudo mv Godot_v4.3-stable_linux.x86_64 /usr/local/bin/godot
+          echo "Godot $(godot --version)"
 
       - name: Download Godot 4.3 Export Templates
         run: |
@@ -48,37 +58,45 @@ jobs:
           unzip -q export_templates.tpz -d export_templates_tmp
           mv export_templates_tmp/templates/* ~/.local/share/godot/export_templates/4.3.stable/
           rm -rf export_templates_tmp export_templates.tpz
+          echo "Templates:"
+          ls ~/.local/share/godot/export_templates/4.3.stable/ | grep android
 
-      - name: Write fresh editor_settings-4.3.tres (BEFORE Godot runs)
+      - name: Write editor settings (4.tres - godot-ci style)
         run: |
           mkdir -p ~/.config/godot
-          # Write a proper Godot resource file with android settings
-          # Using printf to avoid heredoc expansion issues
+          # Write to editor_settings-4.tres only (NOT 4.3.tres)
+          # Godot 4.3 will migrate this to 4.3.tres on first run
           printf '[gd_resource type="EditorSettings" load_steps=1 format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\nexport/android/shutdown_adb_on_exit = false\n' \
-            "$ANDROID_SDK_ROOT" \
+            "$ANDROID_HOME" \
             "$JAVA_HOME" \
-            > ~/.config/godot/editor_settings-4.3.tres
-          echo "=== Written settings file ==="
-          cat ~/.config/godot/editor_settings-4.3.tres
+            > ~/.config/godot/editor_settings-4.tres
+          echo "=== Written editor_settings-4.tres ==="
+          cat ~/.config/godot/editor_settings-4.tres
+          # Confirm no 4.3.tres exists yet
+          ls ~/.config/godot/
 
       - name: Create output directory
         run: mkdir -p build/android
 
-      - name: Export APK (headless, no --import, verbose)
+      - name: Export APK (headless verbose)
         run: |
           godot --headless \
             --path "${{ github.workspace }}" \
             --verbose \
             --export-debug "Android" \
             "${{ github.workspace }}/build/android/GoneGame-debug.apk" 2>&1
-          echo "=== Build output ==="
-          ls -lah build/android/ 2>/dev/null || echo "No APK found"
+          echo "Exit: $?"
+          ls -lah build/android/ 2>/dev/null || echo "No APK"
 
-      - name: Show what Godot saved to settings after export
+      - name: Show settings files after Godot ran
         if: always()
         run: |
-          echo "=== Settings file after Godot ran ==="
-          cat ~/.config/godot/editor_settings-4.3.tres 2>/dev/null | grep -A2 "android" || echo "No android settings found"
+          echo "=== Config files after run ==="
+          ls -la ~/.config/godot/
+          echo "=== Android lines in 4.3.tres ==="
+          grep "android" ~/.config/godot/editor_settings-4.3.tres 2>/dev/null || echo "No 4.3.tres"
+          echo "=== Android lines in 4.tres ==="
+          grep "android" ~/.config/godot/editor_settings-4.tres 2>/dev/null || echo "No 4.tres"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
