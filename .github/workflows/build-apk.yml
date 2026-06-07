@@ -13,6 +13,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install system dependencies (Xvfb + libs)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y xvfb libgl1-mesa-glx libgles2 \
+            libasound2 libpulse0 libx11-6 libxi6 libxrandr2
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -25,9 +31,12 @@ jobs:
       - name: Install Android SDK components
         run: |
           sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
+            "platform-tools" \
             "build-tools;34.0.0" \
             "platforms;android-34" \
             "ndk;23.2.8568313"
+          echo "SDK contents:"
+          ls $ANDROID_SDK_ROOT/
 
       - name: Generate Debug Keystore
         run: |
@@ -37,40 +46,63 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
-          echo "KEYSTORE_PATH=${{ github.workspace }}/debug.keystore" >> $GITHUB_ENV
+
+      - name: Download Godot 4.3
+        run: |
+          wget -q \
+            "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip" \
+            -O godot.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.3-stable_linux.x86_64
+          sudo mv Godot_v4.3-stable_linux.x86_64 /usr/local/bin/godot
+
+      - name: Download Godot 4.3 Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/4.3.stable
+          wget -q \
+            "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz" \
+            -O export_templates.tpz
+          unzip -q export_templates.tpz -d export_templates_tmp
+          mv export_templates_tmp/templates/* ~/.local/share/godot/export_templates/4.3.stable/
+          rm -rf export_templates_tmp export_templates.tpz
+          ls ~/.local/share/godot/export_templates/4.3.stable/ | grep android
+
+      - name: Configure Godot Android Editor Settings (with load_steps)
+        run: |
+          mkdir -p ~/.config/godot
+          printf '[gd_resource type="EditorSettings" load_steps=1 format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\nexport/android/debug_keystore = "%s"\nexport/android/debug_keystore_user = "androiddebugkey"\nexport/android/debug_keystore_pass = "android"\n' \
+            "$ANDROID_SDK_ROOT" \
+            "$JAVA_HOME" \
+            "${{ github.workspace }}/debug.keystore" \
+            > ~/.config/godot/editor_settings-4.tres
+          echo "=== Editor Settings ==="
+          cat ~/.config/godot/editor_settings-4.tres
 
       - name: Patch keystore path in export_presets.cfg
         run: |
           sed -i \
             "s|keystore/debug=\"debug.keystore\"|keystore/debug=\"${{ github.workspace }}/debug.keystore\"|g" \
             export_presets.cfg
-          grep "keystore/debug=" export_presets.cfg | head -1
+          grep "keystore/debug=" export_presets.cfg | head -2
 
-      - name: Export via firebelley/godot-export
-        uses: firebelley/godot-export@v6.0.0
-        with:
-          godot_executable_download_url: "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip"
-          godot_export_templates_download_url: "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz"
-          relative_project_path: "./"
-          archive_output: false
-          export_debug: true
-        env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: "${{ github.workspace }}/debug.keystore"
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: "androiddebugkey"
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: "android"
+      - name: Start Xvfb virtual display
+        run: Xvfb :99 -screen 0 1024x768x24 &
 
-      - name: Locate and upload APK
+      - name: Create output directory
+        run: mkdir -p build/android
+
+      - name: Export APK via Xvfb (no --headless)
         run: |
-          echo "=== Searching for APK ==="
-          find /home/runner -name "*.apk" 2>/dev/null || echo "No APK found in /home/runner"
-          find "${{ github.workspace }}" -name "*.apk" 2>/dev/null || echo "No APK found in workspace"
+          DISPLAY=:99 godot \
+            --export-debug "Android" \
+            "${{ github.workspace }}/build/android/GoneGame-debug.apk" 2>&1
+          echo "=== Build output ==="
+          ls -lah build/android/ || echo "No files in build/android"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: GoneGame-debug-apk
-          path: |
-            /home/runner/work/GoneGame-debug.apk
-            ${{ github.workspace }}/build/android/*.apk
+          path: build/android/GoneGame-debug.apk
           if-no-files-found: warn
           retention-days: 30
