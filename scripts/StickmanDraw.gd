@@ -4,7 +4,7 @@ extends Node2D
 enum State { RUN, JUMP, FALL, DOUBLE_JUMP, SLIDE, DEAD }
 
 var state: State = State.RUN
-var run_phase: float = 0.0
+var run_phase: float = 0.0    # Start at 0 for consistent animation
 var anim_t: float = 0.0   # local timer for state-specific anims
 var squash: float = 1.0
 var stretch: float = 1.0
@@ -74,31 +74,32 @@ func _draw_run() -> void:
 	# Legs (left then right, 180° apart)
 	for i in 2:
 		var ph    := t + i * PI
-		var ua    := sin(ph) * 0.72               # thigh swing
-		var knee  := hip + Vector2(sin(ua) * UPPER_L, cos(ua) * UPPER_L)
-		var bend  := maxf(0.0, sin(ph - PI * 0.45)) * 0.85   # shin bend on back-swing
+		var ua    := sin(ph) * 0.65               # thigh swing (smoother)
+		var knee  := hip + Vector2(sin(ua) * UPPER_L, cos(ua) * UPPER_L + 8.0)  # knee lift
+		var bend  := maxf(0.0, sin(ph - PI * 0.35)) * 0.7   # shin bend on back-swing (smoother)
 		var sa    := ua + bend
-		var foot  := knee + Vector2(sin(sa) * LOWER_L, cos(sa) * LOWER_L)
-		_line(hip, knee)
-		_line(knee, foot)
+		var foot  := knee + Vector2(sin(sa) * LOWER_L * 0.9, cos(sa) * LOWER_L * 0.9)
+		_line(hip, knee, LW)
+		_line(knee, foot, LW)
 
-	# Torso
-	_line(hip, shl)
+	# Torso - stable and upright
+	_line(hip, shl, LW + 2.0)
 
-	# Arms (opposite phase to legs)
+	# Arms (opposite phase to legs) - wide arm swing
 	for i in 2:
 		var ph    := t + (1 - i) * PI
-		var aa    := sin(ph) * 0.55
-		var elbow := shl + Vector2(sin(aa) * ARM_U, absf(cos(aa)) * ARM_U * 0.5 + ARM_U * 0.25)
-		var hand  := elbow + Vector2(sin(aa) * ARM_L, ARM_L * 0.4)
-		_line(shl, elbow)
-		_line(elbow, hand)
+		var aa    := sin(ph) * 0.65
+		var arm_swing = sin(ph) * 25.0  # Big arm swing
+		var elbow := shl + Vector2(arm_swing * 0.6, cos(aa) * ARM_U * 0.6 - ARM_U * 0.3)
+		var hand  := elbow + Vector2(arm_swing * 0.4, ARM_L * 0.2)
+		_line(shl, elbow, LW)
+		_line(elbow, hand, LW)
 
 	# Head with subtle bob
-	var bob := sin(t * 2.0) * 1.8
+	var bob := sin(t * 2.2) * 2.0
 	_dot(Vector2(4.0, HEAD_Y + bob), HR)
-	# Eye
-	draw_circle(Vector2(9.0, HEAD_Y + bob - 1.0), 3.0, DARK)
+	# Eye - looking forward
+	draw_circle(Vector2(9.5, HEAD_Y + bob - 1.0), 3.0, DARK)
 
 # ── JUMP ─────────────────────────────────────────────────────────────────────
 func _draw_jump() -> void:

@@ -56,7 +56,8 @@ func _ready() -> void:
 	player.died.connect(_on_die)
 	
 	_load_high_score()
-	_show_main_menu()
+	# Skip menu for now - go straight to game
+	_start_game()
 
 func _show_main_menu() -> void:
 	game_running = false
@@ -82,7 +83,7 @@ func _start_game() -> void:
 	for c in spawner.get_children():
 		c.queue_free()
 	spawner.reset()
-	player.position = Vector2(200, 800)
+	player.position = Vector2(300, 910)  # Match scene setup
 	player.velocity = Vector2.ZERO
 
 func get_difficulty() -> float:

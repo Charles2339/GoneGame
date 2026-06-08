@@ -9,7 +9,7 @@ const FALL_MULT         := 1.55     # extra gravity on descent
 const FALL_MULT_SHORT   := 1.0      # lighter gravity on short jumps
 const COYOTE_TIME       := 0.10
 const JUMP_BUFFER       := 0.13
-const RUN_PHASE_SPD     := 7.5
+const RUN_PHASE_SPD     := 5.0    # Reduced from 7.5 for smoother animation
 const SLIDE_DURATION    := 0.5
 const EARLY_FALL_MULT   := 2.5      # gravity multiplier when releasing jump early
 
@@ -22,7 +22,7 @@ var jump_held_time      := 0.0
 var slide_timer         := 0.0
 
 @onready var stickman: StickmanDraw = $StickmanDraw
-@onready var collision: CollisionShape2D = $CollisionShape2D
+@onready var collision: CollisionShape2D = $CollisionStanding
 
 signal landed
 signal jumped
