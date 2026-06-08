@@ -1,7 +1,7 @@
 class_name StickmanDraw
 extends Node2D
 
-enum State { RUN, JUMP, FALL, SLIDE, DEAD }
+enum State { RUN, JUMP, FALL, DOUBLE_JUMP, SLIDE, DEAD }
 
 var state: State = State.RUN
 var run_phase: float = 0.0
@@ -52,6 +52,7 @@ func _draw() -> void:
 		State.RUN:  _draw_run()
 		State.JUMP: _draw_jump()
 		State.FALL: _draw_fall()
+		State.DOUBLE_JUMP: _draw_double_jump()
 		State.SLIDE: _draw_slide()
 		State.DEAD: _draw_dead()
 
@@ -118,6 +119,27 @@ func _draw_jump() -> void:
 	_line(hip, shl)
 	_dot(Vector2(0.0, HEAD_Y - 4.0), HR)
 	draw_circle(Vector2(6.0, HEAD_Y - 5.0), 3.0, DARK)
+
+# ── DOUBLE JUMP ──────────────────────────────────────────────────────────────
+func _draw_double_jump() -> void:
+	var rot := sin(anim_t * 12.0) * 0.3  # spinning animation
+	var hip := Vector2(0.0, HIP_Y - 8.0)
+	var shl := Vector2(0.0, SHLDR_Y)
+
+	# Legs spread out in kick pose
+	var lk := hip + Vector2(-18.0 + sin(rot) * 8, 12.0 + cos(rot) * 8)
+	var lf := lk  + Vector2(-22.0, 16.0)
+	var rk := hip + Vector2(16.0 - sin(rot) * 8, 14.0 - cos(rot) * 8)
+	var rf := rk  + Vector2(20.0, 14.0)
+	_line(hip, lk); _line(lk, lf)
+	_line(hip, rk); _line(rk, rf)
+
+	# Arms in dynamic pose
+	_line(shl, shl + Vector2(-24.0 - sin(rot) * 6, -22.0 + cos(rot) * 8))
+	_line(shl, shl + Vector2( 24.0 + sin(rot) * 6, -20.0 - cos(rot) * 8))
+	_line(hip, shl)
+	_dot(Vector2(sin(rot) * 4.0, HEAD_Y - 6.0), HR)
+	draw_circle(Vector2(6.0 + sin(rot) * 3, HEAD_Y - 7.0), 3.0, DARK)
 
 # ── FALL ─────────────────────────────────────────────────────────────────────
 func _draw_fall() -> void:

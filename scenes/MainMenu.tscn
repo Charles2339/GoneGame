@@ -1,0 +1,45 @@
+[gd_scene load_steps=3 type="CanvasLayer"]
+
+[ext_resource type="Script" path="res://scripts/MainMenu.gd"]
+[ext_resource type="Theme" uid="uid=1234567890ab" path=""]
+
+[node name="MainMenu" type="CanvasLayer"]
+layer = 100
+script = ExtResource("Script" path="res://scripts/MainMenu.gd")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+anchors_fill_parent = true
+color = Color(0.05, 0.05, 0.1, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+anchors_fill_parent = true
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 80
+text = "GONE"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 1
+theme_override_font_sizes/font_size = 24
+text = "Endless Runner"
+horizontal_alignment = 1
+
+[node name="PlayButton" type="Button" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 36
+text = "PLAY"
+
+[node name="SettingsLabel" type="Label" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 2
+theme_override_font_sizes/font_size = 18
+text = "Tap to Jump
+S to Slide
+Double Tap to Double Jump"
+horizontal_alignment = 1
