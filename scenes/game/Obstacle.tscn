@@ -1,11 +1,6 @@
-[gd_scene load_steps=2 format=3 uid="uid://obstacle_gone001"]
+[gd_scene load_steps=2 format=3 uid="uid://obstacle_gone002"]
 
 [ext_resource type="Script" path="res://scripts/Obstacle.gd" id="1_obs"]
 
 [node name="Obstacle" type="Node2D"]
 script = ExtResource("1_obs")
-
-[node name="Visual" type="ColorRect" parent="."]
-color = Color(0.95, 0.35, 0.1, 1)
-offset_right = 70.0
-offset_bottom = 120.0
