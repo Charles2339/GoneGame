@@ -1,10 +1,10 @@
 class_name StickmanDraw
 extends Node2D
 
-enum State { RUN, JUMP, FALL, DOUBLE_JUMP, SLIDE, DEAD }
+enum State { RUN, JUMP, FALL, SLIDE, DEAD }
 
 var state: State = State.RUN
-var run_phase: float = 0.0    # Start at 0 for consistent animation
+var run_phase: float = 0.0
 var anim_t: float = 0.0   # local timer for state-specific anims
 var squash: float = 1.0
 var stretch: float = 1.0
@@ -52,7 +52,6 @@ func _draw() -> void:
 		State.RUN:  _draw_run()
 		State.JUMP: _draw_jump()
 		State.FALL: _draw_fall()
-		State.DOUBLE_JUMP: _draw_double_jump()
 		State.SLIDE: _draw_slide()
 		State.DEAD: _draw_dead()
 
@@ -74,32 +73,31 @@ func _draw_run() -> void:
 	# Legs (left then right, 180° apart)
 	for i in 2:
 		var ph    := t + i * PI
-		var ua    := sin(ph) * 0.65               # thigh swing (smoother)
-		var knee  := hip + Vector2(sin(ua) * UPPER_L, cos(ua) * UPPER_L + 8.0)  # knee lift
-		var bend  := maxf(0.0, sin(ph - PI * 0.35)) * 0.7   # shin bend on back-swing (smoother)
+		var ua    := sin(ph) * 0.72               # thigh swing
+		var knee  := hip + Vector2(sin(ua) * UPPER_L, cos(ua) * UPPER_L)
+		var bend  := maxf(0.0, sin(ph - PI * 0.45)) * 0.85   # shin bend on back-swing
 		var sa    := ua + bend
-		var foot  := knee + Vector2(sin(sa) * LOWER_L * 0.9, cos(sa) * LOWER_L * 0.9)
-		_line(hip, knee, LW)
-		_line(knee, foot, LW)
+		var foot  := knee + Vector2(sin(sa) * LOWER_L, cos(sa) * LOWER_L)
+		_line(hip, knee)
+		_line(knee, foot)
 
-	# Torso - stable and upright
-	_line(hip, shl, LW + 2.0)
+	# Torso
+	_line(hip, shl)
 
-	# Arms (opposite phase to legs) - wide arm swing
+	# Arms (opposite phase to legs)
 	for i in 2:
 		var ph    := t + (1 - i) * PI
-		var aa    := sin(ph) * 0.65
-		var arm_swing = sin(ph) * 25.0  # Big arm swing
-		var elbow := shl + Vector2(arm_swing * 0.6, cos(aa) * ARM_U * 0.6 - ARM_U * 0.3)
-		var hand  := elbow + Vector2(arm_swing * 0.4, ARM_L * 0.2)
-		_line(shl, elbow, LW)
-		_line(elbow, hand, LW)
+		var aa    := sin(ph) * 0.55
+		var elbow := shl + Vector2(sin(aa) * ARM_U, absf(cos(aa)) * ARM_U * 0.5 + ARM_U * 0.25)
+		var hand  := elbow + Vector2(sin(aa) * ARM_L, ARM_L * 0.4)
+		_line(shl, elbow)
+		_line(elbow, hand)
 
 	# Head with subtle bob
-	var bob := sin(t * 2.2) * 2.0
+	var bob := sin(t * 2.0) * 1.8
 	_dot(Vector2(4.0, HEAD_Y + bob), HR)
-	# Eye - looking forward
-	draw_circle(Vector2(9.5, HEAD_Y + bob - 1.0), 3.0, DARK)
+	# Eye
+	draw_circle(Vector2(9.0, HEAD_Y + bob - 1.0), 3.0, DARK)
 
 # ── JUMP ─────────────────────────────────────────────────────────────────────
 func _draw_jump() -> void:
@@ -120,27 +118,6 @@ func _draw_jump() -> void:
 	_line(hip, shl)
 	_dot(Vector2(0.0, HEAD_Y - 4.0), HR)
 	draw_circle(Vector2(6.0, HEAD_Y - 5.0), 3.0, DARK)
-
-# ── DOUBLE JUMP ──────────────────────────────────────────────────────────────
-func _draw_double_jump() -> void:
-	var rot := sin(anim_t * 12.0) * 0.3  # spinning animation
-	var hip := Vector2(0.0, HIP_Y - 8.0)
-	var shl := Vector2(0.0, SHLDR_Y)
-
-	# Legs spread out in kick pose
-	var lk := hip + Vector2(-18.0 + sin(rot) * 8, 12.0 + cos(rot) * 8)
-	var lf := lk  + Vector2(-22.0, 16.0)
-	var rk := hip + Vector2(16.0 - sin(rot) * 8, 14.0 - cos(rot) * 8)
-	var rf := rk  + Vector2(20.0, 14.0)
-	_line(hip, lk); _line(lk, lf)
-	_line(hip, rk); _line(rk, rf)
-
-	# Arms in dynamic pose
-	_line(shl, shl + Vector2(-24.0 - sin(rot) * 6, -22.0 + cos(rot) * 8))
-	_line(shl, shl + Vector2( 24.0 + sin(rot) * 6, -20.0 - cos(rot) * 8))
-	_line(hip, shl)
-	_dot(Vector2(sin(rot) * 4.0, HEAD_Y - 6.0), HR)
-	draw_circle(Vector2(6.0 + sin(rot) * 3, HEAD_Y - 7.0), 3.0, DARK)
 
 # ── FALL ─────────────────────────────────────────────────────────────────────
 func _draw_fall() -> void:

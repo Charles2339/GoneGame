@@ -7,7 +7,6 @@ const BG_TILE_W     := 1920.0
 const GND_TILE_W    := 2000.0
 
 var game_running  := false
-var game_started  := false
 var score         := 0.0
 var run_speed     := INITIAL_SPEED
 var elapsed       := 0.0
@@ -26,13 +25,6 @@ var trauma        := 0.0
 @onready var gnd_a:       Node2D          = $GroundVisuals/GroundA
 @onready var gnd_b:       Node2D          = $GroundVisuals/GroundB
 
-# Audio and Particles
-var audio_manager: AudioManager
-var particle_spawner: ParticleSpawner
-
-# Menu
-var main_menu_scene: PackedScene = preload("res://scenes/MainMenu.tscn")
-
 # [node_a_path, node_b_path, factor]
 const BG_LAYERS := [
 	["BgContainer/Mtn1",    "BgContainer/Mtn2",    0.08],
@@ -41,38 +33,14 @@ const BG_LAYERS := [
 ]
 
 func _ready() -> void:
-	# Initialize audio and particles
-	audio_manager = AudioManager.new()
-	add_child(audio_manager)
-	
-	particle_spawner = ParticleSpawner.new()
-	add_child(particle_spawner)
-	
-	# Connect signals
 	$HUD/GameOverPanel/VBox/RestartButton.pressed.connect(_on_restart)
 	player.landed.connect(_on_land)
 	player.jumped.connect(_on_jump)
-	player.double_jumped.connect(_on_double_jump)
 	player.died.connect(_on_die)
-	
-	_load_high_score()
-	# Skip menu for now - go straight to game
-	_start_game()
-
-func _show_main_menu() -> void:
-	game_running = false
-	game_started = false
-	if main_menu_scene:
-		var menu = main_menu_scene.instantiate()
-		add_child(menu)
-		menu.play_pressed.connect(_on_menu_play)
-
-func _on_menu_play() -> void:
 	_start_game()
 
 func _start_game() -> void:
 	game_running = true
-	game_started = true
 	score        = 0.0
 	run_speed    = INITIAL_SPEED
 	elapsed      = 0.0
@@ -83,16 +51,11 @@ func _start_game() -> void:
 	for c in spawner.get_children():
 		c.queue_free()
 	spawner.reset()
-	player.position = Vector2(300, 910)  # Match scene setup
-	player.velocity = Vector2.ZERO
 
 func get_difficulty() -> float:
 	return clampf(1.0 + (elapsed / 60.0) * 2.5, 1.0, 3.5)
 
 func _process(delta: float) -> void:
-	if not game_started:
-		return
-	
 	# Camera trauma shake (README §Game Feel)
 	trauma = maxf(trauma - 2.8 * delta, 0.0)
 	var sh := trauma * trauma
@@ -132,13 +95,10 @@ func on_player_hit() -> void:
 	game_running = false
 	if score > high_score:
 		high_score = score
-		_save_high_score()
 	fs_lbl.text = "Score: %d" % int(score)
 	hs_lbl.text = "Best:  %d" % int(high_score)
 	player.die()
 	add_trauma(0.9)
-	if audio_manager:
-		audio_manager.play_death()
 	_death_sequence()
 
 func _death_sequence() -> void:
@@ -156,19 +116,9 @@ func _show_game_over() -> void:
 
 func _on_land() -> void:
 	add_trauma(0.12)
-	if audio_manager:
-		audio_manager.play_land_soft()
-	if particle_spawner:
-		particle_spawner.emit_landing_particles(player.global_position)
 
 func _on_jump() -> void:
-	if audio_manager:
-		audio_manager.play_jump()
-
-func _on_double_jump() -> void:
-	if audio_manager:
-		audio_manager.play_double_jump()
-	add_trauma(0.1)
+	pass
 
 func _on_die() -> void:
 	add_trauma(0.85)
@@ -176,15 +126,3 @@ func _on_die() -> void:
 func _on_restart() -> void:
 	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
-
-func _load_high_score() -> void:
-	var config = ConfigFile.new()
-	if config.load("user://gone_save.cfg") == OK:
-		high_score = config.get_value("score", "high_score", 0)
-		hs_lbl.text = "Best: %d" % int(high_score)
-
-func _save_high_score() -> void:
-	var config = ConfigFile.new()
-	config.set_value("score", "high_score", int(high_score))
-	config.save("user://gone_save.cfg")
-
